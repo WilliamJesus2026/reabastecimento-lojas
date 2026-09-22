@@ -166,7 +166,7 @@
 
   .bars{display:flex; flex-direction:column; gap:6px;}
   .bar-row{
-    display:grid; grid-template-columns:112px 1fr 84px 34px; align-items:center; gap:12px;
+    display:grid; grid-template-columns:112px 1fr 84px 34px 34px; align-items:center; gap:12px;
     padding:5px 8px; margin:0 -8px; border-radius:8px; cursor:pointer;
     border:1px solid transparent; transition:background .12s ease, border-color .12s ease;
   }
@@ -244,6 +244,26 @@
   }
   footer.note code{font-family:"IBM Plex Mono",monospace; background:var(--surface-2); padding:1px 5px; border-radius:4px;}
 
+  #emailsPanel summary{
+    cursor:pointer; font-family:"Archivo",sans-serif; font-weight:700; font-size:15px;
+    list-style:none; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;
+  }
+  #emailsPanel summary::-webkit-details-marker{ display:none; }
+  #emailsPanel summary::before{ content:"▸ "; color:var(--accent); }
+  #emailsPanel[open] summary::before{ content:"▾ "; }
+  .emails-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:10px;
+  }
+  .email-field{display:flex; align-items:center; gap:8px;}
+  .email-field .code{
+    font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:12.5px;
+    background:var(--surface-2); border-radius:5px; padding:3px 7px; flex-shrink:0;
+  }
+  .email-field input{
+    flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:6px; padding:6px 9px; font-size:12.5px; color:var(--text); font-family:inherit;
+  }
+
   .sample-banner{
     display:flex; align-items:center; gap:10px; background:var(--warning-soft);
     border:1px solid var(--warning); color:var(--text); border-radius:10px;
@@ -286,6 +306,11 @@
   <div id="dashboard">
     <div class="kpi-row" id="kpiRow"></div>
     <div id="alertBanner"></div>
+
+    <details class="panel" id="emailsPanel">
+      <summary>E-mails das lojas <span class="panel-sub" style="display:inline; margin:0;">— cadastra uma vez, o botão &#9993;&#65039; usa isso pra abrir o e-mail já preenchido (fica salvo só neste navegador)</span></summary>
+      <div class="emails-grid" id="emailsGrid" style="margin-top:14px;"></div>
+    </details>
 
     <div class="panel">
       <h2>Códigos recebidos por loja</h2>
@@ -348,7 +373,35 @@
   };
   var STORE_CODES = Object.keys(STORES);
 
-  var state = { onebeat: null, ritmo: null, enviarOverrides: {}, isSample: true };
+  var state = { onebeat: null, ritmo: null, enviarOverrides: {}, isSample: true, emails: {} };
+
+  function loadEmails(){
+    try{
+      var raw = localStorage.getItem("reab_store_emails");
+      state.emails = raw ? JSON.parse(raw) : {};
+    }catch(e){ state.emails = {}; }
+  }
+  function saveEmail(code, value){
+    state.emails[code] = value.trim();
+    try{ localStorage.setItem("reab_store_emails", JSON.stringify(state.emails)); }catch(e){}
+  }
+  function openMailto(store, rows){
+    var email = (state.emails[store] || "").trim();
+    if(!email){
+      alert("Cadastra o e-mail da loja " + store + " primeiro (seção 'E-mails das lojas' logo abaixo do alerta).");
+      return;
+    }
+    var hoje = new Date().toLocaleDateString("pt-BR");
+    var totalUnidades = rows.reduce(function(s,r){ return s + Number(enviarFor(r)||0); }, 0);
+    var assunto = "Reabastecimento " + store + " (" + STORES[store] + ") - " + hoje;
+    var corpo = "Segue a sugestão de reabastecimento de hoje (" + hoje + ") para a loja " + store + " (" + STORES[store] + ").\n\n" +
+      "A lista completa (" + rows.length + " código(s), " + totalUnidades + " unidade(s) no total) foi copiada pra área de transferência — é só colar aqui embaixo (Ctrl+V) antes de enviar.\n";
+    var a = document.createElement("a");
+    a.href = "mailto:" + encodeURIComponent(email) + "?subject=" + encodeURIComponent(assunto) + "&body=" + encodeURIComponent(corpo);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   var SAMPLE_ONEBEAT = [
     ["Estab ABC ACR DADI abe","6001102aa","Cadeira Sting Dobravel Encosto Madeira Assento Cerejeira",4,0,24,4],
@@ -587,6 +640,22 @@
     if(!data) return;
 
     document.getElementById("sampleBanner").hidden = !state.isSample;
+
+    var emailsGrid = document.getElementById("emailsGrid");
+    if(!emailsGrid.dataset.built){
+      STORE_CODES.forEach(function(c){
+        var field = el("div","email-field");
+        field.innerHTML = '<span class="code">' + c + '</span>';
+        var input = document.createElement("input");
+        input.type = "email";
+        input.placeholder = STORES[c] + "@abra.com.br";
+        input.value = state.emails[c] || "";
+        input.addEventListener("change", function(){ saveEmail(c, this.value); render(); });
+        field.appendChild(input);
+        emailsGrid.appendChild(field);
+      });
+      emailsGrid.dataset.built = "1";
+    }
     document.getElementById("genTime").textContent = (state.isSample ? "Exemplo · " : "Carregado ") + new Date().toLocaleString("pt-BR");
 
     var byStore = {};
@@ -664,6 +733,17 @@
         copyRichTable(rowsToEnvioHtml(byStore[c]), rowsToEnvioText(byStore[c]), copyBtn);
       });
       row.appendChild(copyBtn);
+      var mailBtn = el("button","bar-copy","&#9993;&#65039;");
+      mailBtn.type = "button";
+      mailBtn.title = state.emails[c] ? ("Copiar lista e abrir e-mail para " + state.emails[c]) : "Cadastra o e-mail da loja pra habilitar";
+      mailBtn.disabled = count===0;
+      if(count===0) mailBtn.style.visibility = "hidden";
+      mailBtn.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        copyRichTable(rowsToEnvioHtml(byStore[c]), rowsToEnvioText(byStore[c]), mailBtn);
+        openMailto(c, byStore[c]);
+      });
+      row.appendChild(mailBtn);
       row.addEventListener("click", function(){
         if(!count) return;
         document.getElementById("storeFilter").value = c;
@@ -788,6 +868,7 @@
     });
   });
 
+  loadEmails();
   state.onebeat = SAMPLE_ONEBEAT;
   render();
 })();
