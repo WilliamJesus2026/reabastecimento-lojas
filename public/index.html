@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Reabastecimento</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>
+  :root{
+    --bg:#F6F3EC;
+    --surface:#FFFFFF;
+    --surface-2:#EDE7D8;
+    --border:#DED5BE;
+    --text:#241F16;
+    --text-secondary:#6B6250;
+    --text-muted:#948A73;
+    --accent:#C2540A;
+    --accent-ink:#FFFFFF;
+    --accent-soft:#F3DFCB;
+    --good:#276B45;
+    --good-soft:#DCEEE1;
+    --critical:#AC2B1E;
+    --critical-soft:#F7DEDA;
+    --warning:#946200;
+    --warning-soft:#F3E6C4;
+    --shadow: 0 1px 2px rgba(36,31,22,0.06), 0 6px 20px rgba(36,31,22,0.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#171410;
+      --surface:#1F1B15;
+      --surface-2:#2A2419;
+      --border:#3B3325;
+      --text:#F1ECE0;
+      --text-secondary:#B9AF98;
+      --text-muted:#8C826C;
+      --accent:#E88A42;
+      --accent-ink:#1F1B15;
+      --accent-soft:#3A2A18;
+      --good:#6FBF8E;
+      --good-soft:#20342A;
+      --critical:#E27C6E;
+      --critical-soft:#3B241F;
+      --warning:#E0B855;
+      --warning-soft:#3A2F17;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#171410;
+    --surface:#1F1B15;
+    --surface-2:#2A2419;
+    --border:#3B3325;
+    --text:#F1ECE0;
+    --text-secondary:#B9AF98;
+    --text-muted:#8C826C;
+    --accent:#E88A42;
+    --accent-ink:#1F1B15;
+    --accent-soft:#3A2A18;
+    --good:#6FBF8E;
+    --good-soft:#20342A;
+    --critical:#E27C6E;
+    --critical-soft:#3B241F;
+    --warning:#E0B855;
+    --warning-soft:#3A2F17;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 24px 60px;}
+
+  .mono{font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;}
+  .num{font-variant-numeric:tabular-nums;}
+
+  header.top{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    flex-wrap:wrap;
+    padding-bottom:20px; margin-bottom:24px;
+    border-bottom:1px solid var(--border);
+  }
+  .brand-eyebrow{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--accent); font-weight:600; margin-bottom:6px; display:block;
+  }
+  h1{
+    font-family:"Archivo", sans-serif; font-weight:800; font-size:30px;
+    letter-spacing:-0.01em; margin:0; text-wrap:balance;
+  }
+  .subtitle{color:var(--text-secondary); font-size:13.5px; margin-top:4px; max-width:56ch;}
+  #genTime{color:var(--text-muted); font-size:12px; white-space:nowrap;}
+
+  .upload-row{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+  .file-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:9px 14px; font-size:13px; font-weight:500; color:var(--text);
+    cursor:pointer; box-shadow:var(--shadow); transition:border-color .15s ease;
+  }
+  .file-btn:hover{border-color:var(--accent);}
+  .file-btn input{display:none;}
+  .file-btn .req{color:var(--accent); font-weight:600; font-size:11px;}
+  .file-btn.loaded{border-color:var(--good); color:var(--good);}
+  .file-btn .icon{font-size:15px;}
+
+  .empty-state{
+    background:var(--surface); border:1px dashed var(--border); border-radius:14px;
+    padding:64px 32px; text-align:center; color:var(--text-secondary);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .empty-state strong{color:var(--text); font-family:"Archivo",sans-serif; font-size:17px; font-weight:700;}
+
+  [hidden]{display:none !important;}
+
+  .kpi-row{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px; margin-bottom:20px;
+  }
+  .kpi{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:16px 18px; box-shadow:var(--shadow);
+  }
+  .kpi .label{
+    font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--text-muted); font-weight:600; margin-bottom:8px;
+  }
+  .kpi .value{font-family:"Archivo",sans-serif; font-size:30px; font-weight:800; letter-spacing:-0.01em;}
+  .kpi .value.good{color:var(--good);}
+  .kpi .value.critical{color:var(--critical);}
+  .kpi .hint{font-size:12px; color:var(--text-secondary); margin-top:4px;}
+
+  .alert-banner{
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--critical-soft); border:1px solid var(--critical);
+    border-radius:12px; padding:14px 16px; margin-bottom:20px;
+  }
+  .alert-banner .glyph{
+    font-family:"Archivo",sans-serif; font-weight:800; font-size:15px;
+    color:var(--accent-ink); background:var(--critical); border-radius:50%;
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:1px;
+  }
+  .alert-banner .body strong{font-family:"Archivo",sans-serif; font-weight:700; display:block; margin-bottom:2px;}
+  .alert-banner .body span{color:var(--text-secondary); font-size:13px;}
+  .alert-banner .stores{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--critical);}
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:20px 22px; margin-bottom:20px; box-shadow:var(--shadow);
+  }
+  .panel h2{
+    font-family:"Archivo",sans-serif; font-size:15px; font-weight:700; margin:0 0 3px;
+  }
+  .panel .panel-sub{font-size:12.5px; color:var(--text-secondary); margin-bottom:16px;}
+
+  .legend{display:flex; gap:16px; margin-bottom:14px; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary);}
+  .legend .sw{width:10px; height:10px; border-radius:2px;}
+
+  .bars{display:flex; flex-direction:column; gap:6px;}
+  .bar-row{
+    display:grid; grid-template-columns:112px 1fr 84px 34px; align-items:center; gap:12px;
+    padding:5px 8px; margin:0 -8px; border-radius:8px; cursor:pointer;
+    border:1px solid transparent; transition:background .12s ease, border-color .12s ease;
+  }
+  .bar-row:hover{background:var(--surface-2); border-color:var(--border);}
+  .bar-row:hover .bar-copy{opacity:1;}
+  .bar-row .name{font-size:13px; font-weight:500;}
+  .bar-row .name .code{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--text);}
+  .bar-row .name .city{display:block; font-size:11px; color:var(--text-muted); font-weight:400;}
+  .bar-track{
+    position:relative; height:22px; background:var(--surface-2); border-radius:5px; overflow:hidden;
+  }
+  .bar-fill{
+    position:absolute; inset:0 auto 0 0; border-radius:5px;
+    background:var(--good); transition:width .5s ease;
+  }
+  .bar-fill.critical{background:none; border:1.5px dashed var(--critical); width:34px !important; border-radius:5px;}
+  .bar-row .val{font-family:"IBM Plex Mono",monospace; font-size:13px; text-align:right;}
+  .bar-row .val.critical{color:var(--critical); font-weight:600; text-align:left;}
+  .bar-copy{
+    opacity:0; transition:opacity .12s ease;
+    width:30px; height:30px; border-radius:7px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text-secondary); font-size:14px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .bar-copy:hover{border-color:var(--accent); color:var(--accent);}
+  .bar-copy.copied{opacity:1; border-color:var(--good); color:var(--good);}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    background:var(--accent); color:var(--accent-ink); border:none; border-radius:8px;
+    padding:9px 14px; font-size:13px; font-weight:600; font-family:inherit;
+    box-shadow:var(--shadow); white-space:nowrap;
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn.secondary{background:var(--surface); color:var(--text); border:1px solid var(--border);}
+  .btn.copied{background:var(--good); color:#fff;}
+  .enviar-input{
+    width:64px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; text-align:right;
+    background:var(--accent-soft); border:1px solid var(--border); border-radius:6px;
+    padding:4px 6px; color:var(--text); font-weight:600;
+  }
+  .enviar-input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+
+  .table-controls{display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;}
+  .table-controls input[type="search"]{
+    flex:1; min-width:180px; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:8px; padding:8px 12px; font-size:13px; color:var(--text); font-family:inherit;
+  }
+  .table-controls select{
+    background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+    padding:8px 10px; font-size:13px; color:var(--text); font-family:inherit;
+  }
+  .table-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:10px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px;}
+  thead th{
+    text-align:left; padding:9px 12px; background:var(--surface-2);
+    font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--text-muted); font-weight:600; position:sticky; top:0;
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:8px 12px; border-bottom:1px solid var(--border); color:var(--text-secondary);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody td.code{font-family:"IBM Plex Mono",monospace; color:var(--text); font-weight:500;}
+  tbody td.num{font-family:"IBM Plex Mono",monospace; text-align:right; color:var(--text);}
+  tbody tr:hover{background:var(--surface-2);}
+  .pill{
+    display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600;
+    background:var(--surface-2); color:var(--text-secondary);
+  }
+  .table-foot{display:flex; justify-content:space-between; margin-top:10px; font-size:12px; color:var(--text-muted);}
+
+  footer.note{
+    margin-top:28px; font-size:12px; color:var(--text-muted); line-height:1.6;
+    border-top:1px solid var(--border); padding-top:16px;
+  }
+  footer.note code{font-family:"IBM Plex Mono",monospace; background:var(--surface-2); padding:1px 5px; border-radius:4px;}
+
+  .sample-banner{
+    display:flex; align-items:center; gap:10px; background:var(--warning-soft);
+    border:1px solid var(--warning); color:var(--text); border-radius:10px;
+    padding:10px 14px; font-size:12.5px; margin-bottom:18px;
+  }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <span class="brand-eyebrow">Reabastecimento &middot; Lojas</span>
+      <h1>Painel de Reabastecimento</h1>
+      <div class="subtitle">Sobe o export do OneBeat e confere na hora quais lojas vieram completas — sem Excel, sem macro, sem precisar de Python instalado.</div>
+    </div>
+    <div class="upload-row">
+      <label class="file-btn" id="btnOneBeat">
+        <span class="icon">&#128194;</span>
+        <span class="btnLabel">Export OneBeat</span>
+        <span class="req">obrigatório</span>
+        <input type="file" id="fileOneBeat" accept=".xlsx,.xls,.csv">
+      </label>
+      <label class="file-btn" id="btnRitmo">
+        <span class="icon">&#128194;</span>
+        <span class="btnLabel">RITMO POSIÇÃO</span>
+        <span class="req" style="color:var(--text-muted)">opcional</span>
+        <input type="file" id="fileRitmo" accept=".xlsx,.xls,.xlsm,.csv">
+      </label>
+      <span id="genTime"></span>
+    </div>
+  </header>
+
+  <div id="sampleBanner" class="sample-banner">
+    <span>&#9888;&#65039;</span>
+    <span>Mostrando <strong>dados de exemplo</strong> (mesmo formato do último ciclo). Carrega o export real do OneBeat acima pra ver os números de hoje.</span>
+  </div>
+
+  <div id="dashboard">
+    <div class="kpi-row" id="kpiRow"></div>
+    <div id="alertBanner"></div>
+
+    <div class="panel">
+      <h2>Códigos recebidos por loja</h2>
+      <div class="panel-sub">Quantidade de SKUs com sugestão de reposição (Reposição &gt; 0) chegando do OneBeat para cada loja, neste ciclo.</div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--good)"></i>Loja com dados</span>
+        <span><i class="sw" style="background:var(--critical); border:1.5px dashed var(--critical)"></i>Sem nenhum código — confira o filtro "Nome Loja" no export</span>
+      </div>
+      <div class="bars" id="barsContainer"></div>
+      <div class="panel-sub" style="margin:12px 0 0 0; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span>Clica numa loja pra ver a lista dela na tabela abaixo, ou usa o ícone &#128203; pra copiar a lista dela direto.</span>
+        <button class="btn secondary" id="copyAllByStoreBtn">&#128203; Copiar tudo, separado por loja</button>
+      </div>
+    </div>
+
+    <div class="panel" id="tablePanel">
+      <h2>Detalhe por SKU — pronto pra enviar</h2>
+      <div class="panel-sub">Ajusta a coluna <strong>Enviar</strong> se precisar e copia no formato da aba ENVIO (Código, Nome, Classe, Loja, Enviar) pra colar no e-mail da loja.</div>
+      <div class="table-controls">
+        <input type="search" id="searchInput" placeholder="Buscar código ou nome do produto…">
+        <select id="storeFilter"></select>
+        <button class="btn" id="copyAllBtn">&#128203; Copiar lista (formato ENVIO)</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Loja</th><th>Código</th><th>Produto</th>
+              <th style="text-align:right">Alvo</th>
+              <th style="text-align:right">Estoque loja</th>
+              <th style="text-align:right">Estoque CD</th>
+              <th style="text-align:right">Sugestão</th>
+              <th id="thDisponivel" style="text-align:right" hidden>Disponível</th>
+              <th id="thSituacao" hidden>Situação</th>
+              <th style="text-align:right">Enviar</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="table-foot">
+        <span id="rowCount"></span>
+        <span>ordenado por reposição, maior primeiro</span>
+      </div>
+    </div>
+  </div>
+
+  <footer class="note">
+    Regra aplicada: só entram códigos com <code>Reposição &gt; 0</code> no export do OneBeat, igual ao processo anterior em planilha.
+    Loja identificada pelo código de 3 letras (ex.: <code>CSH</code>, <code>ACR</code>) dentro do texto da coluna Loja.
+    Nada é enviado a servidor nenhum — a leitura do arquivo acontece só aqui no seu navegador.
+  </footer>
+</div>
+
+<script>
+(function(){
+  var STORES = {
+    ACV:"Gaia", ACR:"Dadi", MCO:"Eco", CSH:"Bada", REC:"Trip",
+    ABI:"Papel", VIA:"Flip", ICA:"Noga", RIO:"Zoon", SHT:"Arte", BSH:"Zeni"
+  };
+  var STORE_CODES = Object.keys(STORES);
+
+  var state = { onebeat: null, ritmo: null, enviarOverrides: {}, isSample: true };
+
+  var SAMPLE_ONEBEAT = [
+    ["Estab ABC ACR DADI abe","6001102aa","Cadeira Sting Dobravel Encosto Madeira Assento Cerejeira",4,0,24,4],
+    ["Estab ABC ACR DADI abe","1561120aa","Cadeira de Escritorio Baixa Lume Cinza NR-17",4,0,33,4],
+    ["Estab ABC CSH BADA abe","1560006am","Cadeira de Escritorio Madrid Alta Cromado/Caramelo",3,0,52,3],
+    ["Estab ABC CSH BADA abe","1051103bb","Cadeira Nord Encosto Madeira Assento Texture Off White",3,0,103,3],
+    ["Estab ABC CSH BADA abe","1561028pr","Cadeira De Escritorio Franca Alta c/ Regulagem Preto",4,1,95,3],
+    ["Estab ABR RIO ZOON abe","1342503aa","Prateleira Nala 80cmx20cm Louro Freijo",3,0,86,3],
+    ["Estab ABR RIO ZOON abe","1342503ba","Prateleira Nala 1,20mx20cm Louro Freijo",3,0,125,3],
+    ["Estab ABH REC TRIP abe","1342503ca","Prateleira Nala 1,80mx20cm Louro Freijo",3,0,88,3],
+    ["Estab ABC BSH ZENI","1920000cb","Cadeira Ami Encosto Estofado Giratoria Assento PU Caramelado",4,0,2,2],
+    ["Estab ABC ABI PAPEL Abe","1561210ap","Assento Eiffel Em Pp Azul Petroleo",2,0,6,2],
+    ["Estab ABC ABI PAPEL Abe","9200005ea","Capa de Almofada Drapeada Terra 50X50",6,1,40,5],
+    ["Estab ABH MCO ECO abe","1561044aa","Cadeira de Escritorio Oslo Preta Selo NR-17",2,0,38,2],
+    ["Estab ABH MCO ECO abe","1561231pr","Cadeira Eiffel Encosto Estofado Assento Botone Preta",2,0,35,2],
+    ["Estab ABR VIA FLIP abe","6000013ab","Mesa Lateral Haste 30cmx30cm Altura 56cm Verde Musgo",2,0,18,2],
+    ["Estab ABR ICA NOGA abe","1561231br","Cadeira Eiffel Encosto Estofado Assento Botone Branca",2,0,22,2]
+  ].map(function(r){
+    var loja = r[0];
+    return {loja:loja,codigo:r[1],rotulo:r[2],alvo:r[3],estLoja:r[4],estCd:r[5],reposicao:r[6],store:findStore(loja)};
+  });
+
+  function rowKey(r){ return r.loja + "|" + r.codigo; }
+
+  function classeFor(codigo){
+    if(state.ritmo && state.ritmo[codigo] && state.ritmo[codigo].classe) return state.ritmo[codigo].classe;
+    return "";
+  }
+
+  function enviarFor(r){
+    var k = rowKey(r);
+    return state.enviarOverrides[k] != null ? state.enviarOverrides[k] : r.reposicao;
+  }
+
+  function escHtml(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  var ENVIO_HEADERS = ["Código","Nome","Classe","Loja","Enviar"];
+
+  function rowsToEnvioText(rows){
+    var lines = [ENVIO_HEADERS.join("\t")];
+    rows.forEach(function(r){
+      lines.push([r.codigo, r.rotulo, classeFor(r.codigo), r.loja, enviarFor(r)].join("\t"));
+    });
+    return lines.join("\n");
+  }
+
+  // tabela HTML com grade de verdade, pra colar em cliente de e-mail (Gmail/Outlook) e sair formatada
+  function rowsToEnvioHtml(rows, titulo){
+    var thStyle = 'style="border:1px solid #999;background:#f0ead9;padding:6px 10px;text-align:left;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;"';
+    var tdStyle = 'style="border:1px solid #999;padding:5px 10px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;"';
+    var tdNum = 'style="border:1px solid #999;padding:5px 10px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;text-align:right;"';
+    var html = "";
+    if(titulo){
+      html += '<h3 style="font-family:Arial,Helvetica,sans-serif;margin:18px 0 6px;">' + escHtml(titulo) + '</h3>';
+    }
+    html += '<table style="border-collapse:collapse;margin-bottom:8px;">';
+    html += "<tr>" + ENVIO_HEADERS.map(function(h){ return "<th "+thStyle+">"+escHtml(h)+"</th>"; }).join("") + "</tr>";
+    rows.forEach(function(r){
+      html += "<tr>"
+        + "<td "+tdStyle+">"+escHtml(r.codigo)+"</td>"
+        + "<td "+tdStyle+">"+escHtml(r.rotulo)+"</td>"
+        + "<td "+tdStyle+">"+escHtml(classeFor(r.codigo))+"</td>"
+        + "<td "+tdStyle+">"+escHtml(r.loja)+"</td>"
+        + "<td "+tdNum+">"+escHtml(enviarFor(r))+"</td>"
+        + "</tr>";
+    });
+    html += "</table>";
+    return html;
+  }
+
+  function feedbackCopied(btnEl){
+    var orig = btnEl.dataset.origLabel || btnEl.innerHTML;
+    btnEl.dataset.origLabel = orig;
+    btnEl.innerHTML = "&#10003; Copiado!";
+    btnEl.classList.add("copied");
+    setTimeout(function(){ btnEl.innerHTML = orig; btnEl.classList.remove("copied"); }, 1600);
+  }
+
+  // copia como tabela rica (grade real ao colar em e-mail) + texto simples como reserva
+  function copyRichTable(html, text, btnEl){
+    var fullHtml = '<div>' + html + '</div>';
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      var item = new ClipboardItem({
+        "text/html": new Blob([fullHtml], {type:"text/html"}),
+        "text/plain": new Blob([text], {type:"text/plain"})
+      });
+      navigator.clipboard.write([item]).then(function(){ feedbackCopied(btnEl); })
+        .catch(function(){ copyToClipboard(text, btnEl); });
+    } else {
+      copyToClipboard(text, btnEl);
+    }
+  }
+
+  function copyToClipboard(text, btnEl){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ feedbackCopied(btnEl); })
+        .catch(function(){ fallbackCopy(text); feedbackCopied(btnEl); });
+    } else {
+      fallbackCopy(text); feedbackCopied(btnEl);
+    }
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  function findStore(lojaText){
+    if(!lojaText) return null;
+    var tokens = String(lojaText).trim().split(/\s+/);
+    for(var i=0;i<tokens.length;i++){
+      var t = tokens[i].toUpperCase();
+      if(STORE_CODES.indexOf(t) !== -1) return t;
+    }
+    return null;
+  }
+
+  function normHeader(h){ return String(h||"").trim().toLowerCase(); }
+
+  function parseOneBeat(rows){
+    if(!rows.length) return [];
+    var header = rows[0].map(normHeader);
+    var idx = {
+      loja: header.indexOf("loja"),
+      codigo: header.indexOf("codigo") !== -1 ? header.indexOf("codigo") : header.indexOf("código"),
+      rotulo: header.indexOf("rótulo") !== -1 ? header.indexOf("rótulo") : header.indexOf("rotulo"),
+      alvo: header.indexOf("alvo"),
+      estLoja: header.indexOf("estoque loja"),
+      estCd: header.indexOf("estoque cd"),
+      reposicao: header.indexOf("reposição") !== -1 ? header.indexOf("reposição") : header.indexOf("reposicao")
+    };
+    var out = [];
+    for(var r=1;r<rows.length;r++){
+      var row = rows[r];
+      if(!row || !row.length) continue;
+      var loja = row[idx.loja], codigo = row[idx.codigo];
+      if(!loja || !codigo) continue;
+      if(String(loja).trim().toLowerCase() === "total") continue;
+      var reposicao = Number(row[idx.reposicao]);
+      if(!(reposicao > 0)) continue;
+      out.push({
+        loja: String(loja).trim(),
+        codigo: String(codigo).trim(),
+        rotulo: row[idx.rotulo] || "",
+        alvo: Number(row[idx.alvo]) || 0,
+        estLoja: Number(row[idx.estLoja]) || 0,
+        estCd: Number(row[idx.estCd]) || 0,
+        reposicao: reposicao,
+        store: findStore(loja)
+      });
+    }
+    return out;
+  }
+
+  function normKey(s){
+    return String(s||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  }
+  function findExact(headerNorm, name){ return headerNorm.indexOf(name); }
+  function findContains(headerNorm, needle){
+    for(var i=0;i<headerNorm.length;i++){ if(headerNorm[i].indexOf(needle)!==-1) return i; }
+    return -1;
+  }
+
+  function parseRitmo(rows){
+    if(!rows.length) return {};
+    var headerNorm = rows[0].map(normKey);
+    var idxCodigo = findExact(headerNorm,"recurso");
+    if(idxCodigo===-1) idxCodigo = findContains(headerNorm,"codigo");
+    if(idxCodigo===-1) idxCodigo = 1; // fallback: layout antigo (coluna B)
+    var idxDisp = findExact(headerNorm,"disponivel");
+    if(idxDisp===-1) idxDisp = findContains(headerNorm,"disponivel");
+    var idxSitu = findExact(headerNorm,"situacao");
+    var idxClasse = findContains(headerNorm,"classe");
+
+    var map = {};
+    for(var r=1;r<rows.length;r++){
+      var row = rows[r];
+      if(!row) continue;
+      var codigo = row[idxCodigo];
+      if(!codigo) continue;
+      codigo = String(codigo).trim();
+      if(map[codigo]) continue;
+      map[codigo] = {
+        disponivel: idxDisp!==-1 ? row[idxDisp] : null,
+        situacao: idxSitu!==-1 ? row[idxSitu] : null,
+        classe: idxClasse!==-1 ? row[idxClasse] : null
+      };
+    }
+    return map;
+  }
+
+  function decodeBytes(bytes){
+    var utf8 = new TextDecoder("utf-8").decode(bytes);
+    if(utf8.indexOf("\uFFFD") === -1) return utf8;
+    try{ return new TextDecoder("windows-1252").decode(bytes); }
+    catch(e){ return utf8; }
+  }
+
+  function readWorkbook(file, cb){
+    var isCsv = /\.csv$/i.test(file.name);
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var wb, ws, rows;
+      if(isCsv){
+        var text = decodeBytes(new Uint8Array(e.target.result));
+        wb = XLSX.read(text, {type:"string", raw:true});
+        ws = wb.Sheets[wb.SheetNames[0]];
+      } else {
+        var data = new Uint8Array(e.target.result);
+        wb = XLSX.read(data, {type:"array"});
+        var sheetName = wb.SheetNames.includes("RITMO POSIÇÃO") ? "RITMO POSIÇÃO" :
+                        (wb.SheetNames.includes("onebeat") ? "onebeat" : wb.SheetNames[0]);
+        ws = wb.Sheets[sheetName];
+      }
+      rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+      cb(rows);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function el(tag, cls, html){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(html !== undefined) e.innerHTML = html;
+    return e;
+  }
+
+  function render(){
+    var data = state.onebeat;
+    if(!data) return;
+
+    document.getElementById("sampleBanner").hidden = !state.isSample;
+    document.getElementById("genTime").textContent = (state.isSample ? "Exemplo · " : "Carregado ") + new Date().toLocaleString("pt-BR");
+
+    var byStore = {};
+    STORE_CODES.forEach(function(c){ byStore[c] = []; });
+    var unmatched = [];
+    data.forEach(function(row){
+      if(row.store) byStore[row.store].push(row);
+      else unmatched.push(row);
+    });
+
+    state.byStore = byStore;
+
+    var storesWithData = STORE_CODES.filter(function(c){ return byStore[c].length > 0; });
+    var storesMissing = STORE_CODES.filter(function(c){ return byStore[c].length === 0; });
+    var totalCodigos = data.length;
+    var totalUnidades = data.reduce(function(s,r){ return s + r.reposicao; }, 0);
+
+    // KPIs
+    var kpiRow = document.getElementById("kpiRow");
+    kpiRow.innerHTML = "";
+    function kpi(label, value, hint, cls){
+      var k = el("div","kpi");
+      k.appendChild(el("div","label",label));
+      k.appendChild(el("div","value num" + (cls?(" "+cls):""), value));
+      if(hint) k.appendChild(el("div","hint",hint));
+      kpiRow.appendChild(k);
+    }
+    kpi("Lojas monitoradas", STORE_CODES.length, "cadastradas no painel");
+    kpi("Lojas com dados", storesWithData.length, "receberam código neste ciclo", "good");
+    kpi("Lojas sem dados", storesMissing.length, storesMissing.length ? storesMissing.join(", ") : "nenhuma — tudo certo", storesMissing.length ? "critical" : "good");
+    kpi("Códigos p/ repor", totalCodigos.toLocaleString("pt-BR"), "SKUs com Reposição > 0");
+    kpi("Unidades sugeridas", totalUnidades.toLocaleString("pt-BR"), "soma da coluna Reposição");
+
+    // Alert banner
+    var alertBanner = document.getElementById("alertBanner");
+    alertBanner.innerHTML = "";
+    if(storesMissing.length){
+      var b = el("div","alert-banner");
+      b.appendChild(el("div","glyph","!"));
+      var body = el("div","body");
+      body.appendChild(el("strong", storesMissing.length + " loja(s) sem nenhum código neste export"));
+      var span = el("span");
+      span.innerHTML = 'Prováveis candidatas: <span class="stores">' + storesMissing.map(function(c){return c+" ("+STORES[c]+")";}).join(", ") +
+        '</span>. Confira se essas lojas estão marcadas no filtro "Nome Loja" ao gerar o export no OneBeat — não é problema desta planilha.';
+      body.appendChild(span);
+      b.appendChild(body);
+      alertBanner.appendChild(b);
+    }
+
+    // Bars
+    var barsContainer = document.getElementById("barsContainer");
+    barsContainer.innerHTML = "";
+    var maxCount = Math.max.apply(null, STORE_CODES.map(function(c){ return byStore[c].length; }).concat([1]));
+    STORE_CODES.forEach(function(c){
+      var count = byStore[c].length;
+      var row = el("div","bar-row");
+      row.title = count ? ("Ver lista de " + c + " na tabela") : "Sem código nenhum neste ciclo";
+      var name = el("div","name");
+      name.innerHTML = '<span class="code">' + c + '</span><span class="city">' + STORES[c] + '</span>';
+      row.appendChild(name);
+      var track = el("div","bar-track");
+      var fill = el("div","bar-fill" + (count===0 ? " critical" : ""));
+      if(count>0) fill.style.width = Math.max(3, Math.round(100*count/maxCount)) + "%";
+      track.appendChild(fill);
+      row.appendChild(track);
+      var val = el("div","val" + (count===0 ? " critical" : ""), count===0 ? "sem dados" : count.toLocaleString("pt-BR"));
+      row.appendChild(val);
+      var copyBtn = el("button","bar-copy","&#128203;");
+      copyBtn.type = "button";
+      copyBtn.title = "Copiar lista de " + c + " (formato ENVIO)";
+      copyBtn.disabled = count===0;
+      if(count===0) copyBtn.style.visibility = "hidden";
+      copyBtn.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        copyRichTable(rowsToEnvioHtml(byStore[c]), rowsToEnvioText(byStore[c]), copyBtn);
+      });
+      row.appendChild(copyBtn);
+      row.addEventListener("click", function(){
+        if(!count) return;
+        document.getElementById("storeFilter").value = c;
+        document.getElementById("searchInput").value = "";
+        renderTable();
+        document.getElementById("tablePanel").scrollIntoView({behavior:"smooth", block:"start"});
+      });
+      barsContainer.appendChild(row);
+    });
+
+    // Table
+    var hasRitmo = !!state.ritmo;
+    document.getElementById("thDisponivel").hidden = !hasRitmo;
+    document.getElementById("thSituacao").hidden = !hasRitmo;
+
+    var storeFilter = document.getElementById("storeFilter");
+    storeFilter.innerHTML = '<option value="">Todas as lojas</option>' +
+      STORE_CODES.map(function(c){ return '<option value="'+c+'">'+c+' · '+STORES[c]+'</option>'; }).join("");
+
+    var allRows = data.slice().sort(function(a,b){ return b.reposicao - a.reposicao; });
+    state.allRows = allRows;
+
+    function currentFiltered(){
+      var q = document.getElementById("searchInput").value.trim().toLowerCase();
+      var storeSel = storeFilter.value;
+      return allRows.filter(function(r){
+        if(storeSel && r.store !== storeSel) return false;
+        if(q && r.codigo.toLowerCase().indexOf(q)===-1 && String(r.rotulo).toLowerCase().indexOf(q)===-1) return false;
+        return true;
+      });
+    }
+
+    function renderTable(){
+      var filtered = currentFiltered();
+      var tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+      var shown = Math.min(filtered.length, 300);
+      for(var i=0;i<shown;i++){
+        var r = filtered[i];
+        var tr = document.createElement("tr");
+        var lojaLabel = r.store ? (r.store + " · " + STORES[r.store]) : "?";
+        var tds = [
+          ['<span class="pill">'+lojaLabel+'</span>', false],
+          [r.codigo, "code"],
+          [r.rotulo, false],
+          [r.alvo.toLocaleString("pt-BR"), "num"],
+          [r.estLoja.toLocaleString("pt-BR"), "num"],
+          [r.estCd.toLocaleString("pt-BR"), "num"],
+          [r.reposicao.toLocaleString("pt-BR"), "num"]
+        ];
+        tds.forEach(function(pair){
+          var td = document.createElement("td");
+          if(pair[1]) td.className = pair[1];
+          td.innerHTML = pair[0];
+          tr.appendChild(td);
+        });
+        if(hasRitmo){
+          var ritmoInfo = state.ritmo[r.codigo] || {};
+          var tdD = document.createElement("td"); tdD.className="num";
+          tdD.textContent = ritmoInfo.disponivel != null ? ritmoInfo.disponivel : "—";
+          tr.appendChild(tdD);
+          var tdS = document.createElement("td");
+          tdS.textContent = ritmoInfo.situacao || "—";
+          tr.appendChild(tdS);
+        }
+        var tdE = document.createElement("td"); tdE.style.textAlign = "right";
+        var input = document.createElement("input");
+        input.type = "number"; input.min = "0"; input.className = "enviar-input";
+        input.value = enviarFor(r);
+        (function(rowRef){
+          input.addEventListener("change", function(){
+            var v = parseInt(this.value, 10);
+            state.enviarOverrides[rowKey(rowRef)] = isNaN(v) ? 0 : v;
+          });
+        })(r);
+        tdE.appendChild(input);
+        tr.appendChild(tdE);
+        tbody.appendChild(tr);
+      }
+      document.getElementById("rowCount").textContent = shown + " de " + filtered.length + " linha(s) exibidas" + (filtered.length>300 ? " (limite de exibição 300 — refine a busca)" : "");
+    }
+    document.getElementById("searchInput").oninput = renderTable;
+    storeFilter.onchange = renderTable;
+    document.getElementById("copyAllBtn").onclick = function(){
+      var rows = currentFiltered();
+      copyRichTable(rowsToEnvioHtml(rows), rowsToEnvioText(rows), this);
+    };
+    document.getElementById("copyAllByStoreBtn").onclick = function(){
+      var htmlParts = [], textParts = [];
+      STORE_CODES.forEach(function(c){
+        var rows = state.byStore[c];
+        if(!rows || !rows.length) return;
+        htmlParts.push(rowsToEnvioHtml(rows, c + " · " + STORES[c]));
+        textParts.push("=== " + c + " · " + STORES[c] + " ===\n" + rowsToEnvioText(rows));
+      });
+      copyRichTable(htmlParts.join(""), textParts.join("\n\n"), this);
+    };
+    renderTable();
+  }
+
+  document.getElementById("fileOneBeat").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    readWorkbook(file, function(rows){
+      state.onebeat = parseOneBeat(rows);
+      state.enviarOverrides = {};
+      state.isSample = false;
+      document.getElementById("btnOneBeat").classList.add("loaded");
+      document.getElementById("btnOneBeat").querySelector(".btnLabel").textContent = file.name.length > 22 ? file.name.slice(0,20)+"…" : file.name;
+      render();
+    });
+  });
+
+  document.getElementById("fileRitmo").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    readWorkbook(file, function(rows){
+      state.ritmo = parseRitmo(rows);
+      document.getElementById("btnRitmo").classList.add("loaded");
+      document.getElementById("btnRitmo").querySelector(".btnLabel").textContent = file.name.length > 22 ? file.name.slice(0,20)+"…" : file.name;
+      if(state.onebeat) render();
+    });
+  });
+
+  state.onebeat = SAMPLE_ONEBEAT;
+  render();
+})();
+</script>
+
+</body>
+</html>
