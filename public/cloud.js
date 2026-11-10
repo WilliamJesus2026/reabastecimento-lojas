@@ -5,7 +5,7 @@
   'use strict';
 
   // Domínios aceitos no login. A regra que vale de verdade está em firestore.rules (mantenha as duas iguais).
-  var ALLOWED_DOMAINS = ['abracadabra.com.br'];
+  var ALLOWED_DOMAINS = ['reabastecimento.abra'];   // usuários internos: <usuario>@reabastecimento.abra (e-mail fictício, nunca recebe nada)
   var LOCAL_KEY = 'reab_local_cloud_v1';
   var UNDO_MS = 15 * 60 * 1000;
 
@@ -23,8 +23,16 @@
     return !!m && ALLOWED_DOMAINS.indexOf(m[1]) !== -1;
   }
 
+  // O painel pede só "usuário"; o Firebase exige formato de e-mail, então guardamos <usuario>@reabastecimento.abra.
+  function userToEmail(u) {
+    u = String(u || '').trim().toLowerCase();
+    if (u.indexOf('@') !== -1) u = u.split('@')[0];
+    return /^[a-z0-9._-]{2,30}$/.test(u) ? u + '@' + ALLOWED_DOMAINS[0] : null;
+  }
+  function badUser() { return makeError('Usuário inválido: use de 2 a 30 letras, números, ponto, traço ou sublinhado.', 'bad-user'); }
+
   function makeError(message, code) { var e = new Error(message); e.code = code || 'cloud'; e.userFacing = true; return e; }
-  function needLogin() { return makeError('Entre com sua conta corporativa para usar o histórico.', 'auth-required'); }
+  function needLogin() { return makeError('Entre com seu usuário e senha para usar o histórico.', 'auth-required'); }
 
   function friendlyAuthError(e) {
     var c = e && e.code || '';
@@ -32,12 +40,12 @@
       'auth/invalid-credential': 'E-mail ou senha incorretos.',
       'auth/wrong-password': 'E-mail ou senha incorretos.',
       'auth/user-not-found': 'E-mail ou senha incorretos.',
-      'auth/invalid-email': 'Esse e-mail não parece válido.',
-      'auth/email-already-in-use': 'Já existe uma conta com esse e-mail. Use "Entrar" ou "Esqueci a senha".',
+      'auth/invalid-email': 'Usuário inválido: use letras e números.',
+      'auth/email-already-in-use': 'Esse usuário já existe. Use "Entrar".',
       'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
       'auth/too-many-requests': 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.',
       'auth/network-request-failed': 'Sem conexão com a internet. Confira a rede e tente de novo.',
-      'auth/operation-not-allowed': 'O login por e-mail e senha ainda não foi ativado no Firebase (Authentication > Sign-in method).',
+      'auth/operation-not-allowed': 'O login por usuário e senha ainda não foi ativado no Firebase (Authentication > Sign-in method).',
       'auth/missing-password': 'Digite a senha.',
       'permission-denied': 'Esta conta não tem acesso ao histórico. Peça a liberação do seu e-mail ao administrador do painel.'
     };
@@ -139,22 +147,19 @@
           return snapshot();
         });
     },
-    signIn: function (email, pass) {
-      return auth.signInWithEmailAndPassword(String(email || '').trim(), pass).then(function () {}, function (e) { throw friendlyAuthError(e); });
+    signIn: function (user, pass) {
+      var email = userToEmail(user);
+      if (!email) return Promise.reject(badUser());
+      return auth.signInWithEmailAndPassword(email, pass).then(function () {}, function (e) { throw friendlyAuthError(e); });
     },
-    signUp: function (email, pass) {
-      email = String(email || '').trim();
-      if (!domainOk(email)) return Promise.reject(makeError('Use seu e-mail corporativo (@' + ALLOWED_DOMAINS.join(' ou @') + ').', 'domain'));
+    signUp: function (user, pass) {
+      var email = userToEmail(user);
+      if (!email) return Promise.reject(badUser());
       return auth.createUserWithEmailAndPassword(email, pass)
         .then(function () { setUser(auth.currentUser); }, function (e) { throw friendlyAuthError(e); });
     },
-    resetPassword: function (email) {
-      return auth.sendPasswordResetEmail(String(email || '').trim()).then(function () {}, function (e) { throw friendlyAuthError(e); });
-    },
-    resendVerification: function () {
-      if (!auth.currentUser) return Promise.reject(needLogin());
-      return auth.currentUser.sendEmailVerification().then(function () {}, function (e) { throw friendlyAuthError(e); });
-    },
+    resetPassword: function () { return Promise.reject(makeError('Para trocar a senha, peça ao administrador do painel (Firebase > Authentication).', 'no-reset')); },
+    resendVerification: function () { return Promise.resolve(); },
     refresh: function () {
       if (!auth.currentUser) return Promise.resolve(snapshot());
       return auth.currentUser.reload()
@@ -207,7 +212,7 @@
   var api = {
     ALLOWED_DOMAINS: ALLOWED_DOMAINS, UNDO_MS: UNDO_MS,
     _loadScript: loadScript,
-    domainOk: domainOk,
+    domainOk: domainOk, userToEmail: userToEmail,
     friendlyAuthError: friendlyAuthError,
     getState: snapshot,
     onChange: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (x) { return x !== fn; }); }; },

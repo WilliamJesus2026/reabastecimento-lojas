@@ -209,16 +209,16 @@ try{var t=localStorage.getItem('reab_theme');if(t==='dark'||t==='light')document
     <div id="loginForm">
       <div class="seg" id="loginSeg" role="group" aria-label="Tipo de acesso">
         <button type="button" data-mode="in" aria-pressed="true">Entrar</button>
-        <button type="button" data-mode="up" aria-pressed="false">Criar conta</button>
+        <button type="button" data-mode="up" aria-pressed="false">Criar usuário</button>
       </div>
-      <label class="fld">E-mail corporativo<input id="lgEmail" type="email" autocomplete="username" placeholder="nome@abracadabra.com.br"></label>
+      <label class="fld">Usuário<input id="lgEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ex.: admin1"></label>
       <label class="fld" id="lgPassWrap">Senha<input id="lgPass" type="password" autocomplete="current-password"></label>
       <p class="hint" id="lgHint"></p>
       <p class="form-error" id="lgError" hidden></p>
-      <div class="btn-row"><button class="btn btn-primary" id="lgSubmit" type="button">Entrar</button><button class="link-btn" id="lgForgot" type="button">Esqueci a senha</button></div>
+      <div class="btn-row"><button class="btn btn-primary" id="lgSubmit" type="button">Entrar</button><button class="link-btn" id="lgForgot" type="button" hidden>Esqueci a senha</button></div>
     </div>
     <div id="loginVerify" hidden>
-      <p>A conta <b id="vfEmail"></b> não pode usar o painel (só e-mails @abracadabra.com.br liberados). Entre com outra conta.</p>
+      <p>O usuário <b id="vfEmail"></b> não está liberado para usar o painel. Entre com outro usuário.</p>
       <p class="hint" id="vfMsg"></p>
       <div class="btn-row"><button class="btn" id="vfDone" type="button" hidden>Já confirmei</button><button class="btn" id="vfResend" type="button" hidden>Reenviar e-mail</button><button class="btn btn-primary" id="vfOut" type="button">Sair e trocar de conta</button></div>
     </div>

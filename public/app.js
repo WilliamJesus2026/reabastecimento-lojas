@@ -67,6 +67,7 @@
   const fmtStamp = ts => { const d = new Date(ts); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
   const fmtFull = ts => { const d = new Date(ts); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
   const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+  const who = e => String(e == null ? '' : e).split('@')[0];
   const cycleIso = () => S.meta.cycle || todayIso();
 
   function findStore(loja) {
@@ -243,7 +244,7 @@
       } else if (known) {
         const env = S.sentCycle[code];
         foot = env
-          ? '<span class="chip chip-sent" title="Registrado por ' + esc(env.por) + '">' + icon('check') + 'Enviado ' + esc(fmtStamp(env.ts).slice(6)) + '</span><span class="num">' + fmt(env.totalUnidades) + ' un.</span>'
+          ? '<span class="chip chip-sent" title="Registrado por ' + esc(who(env.por)) + '">' + icon('check') + 'Enviado ' + esc(fmtStamp(env.ts).slice(6)) + '</span><span class="num">' + fmt(env.totalUnidades) + ' un.</span>'
           : '<span class="chip chip-pending">Pendente</span><span class="num">' + fmt(units) + ' un.</span>';
       } else {
         foot = '<span class="chip">' + icon('check') + 'Com dados</span><span class="num">' + fmt(units) + ' un.</span>';
@@ -374,7 +375,7 @@
     const note = $('sentNote');
     note.hidden = !env;
     if (env) {
-      note.innerHTML = '<span class="tag">' + icon('check') + '</span><div><b>Envio registrado em ' + esc(fmtFull(env.ts)) + '</b> por ' + esc(env.por) + ' — ' +
+      note.innerHTML = '<span class="tag">' + icon('check') + '</span><div><b>Envio registrado em ' + esc(fmtFull(env.ts)) + '</b> por ' + esc(who(env.por)) + ' — ' +
         plural(env.totalItens, 'item', 'itens') + ', ' + fmt(env.totalUnidades) + ' unidades. <button type="button" class="link-btn" data-go="historico">Ver no histórico</button></div>';
     }
     const confirmBar = $('mailBar');
@@ -604,7 +605,7 @@
     registering = true;
     const prev = S.sentCycle[code];
     const go = prev
-      ? askConfirm('Já existe um envio da ' + code + ' neste ciclo', 'Registrado em ' + fmtFull(prev.ts) + ' por ' + prev.por + '. Registrar outro mesmo assim?', 'Registrar outro')
+      ? askConfirm('Já existe um envio da ' + code + ' neste ciclo', 'Registrado em ' + fmtFull(prev.ts) + ' por ' + who(prev.por) + '. Registrar outro mesmo assim?', 'Registrar outro')
       : Promise.resolve(true);
     go.then(yes => {
       if (!yes) return null;
@@ -662,7 +663,7 @@
       const blocked = S.cloud.error;
       gate.innerHTML = blocked
         ? gateHtml('Nuvem indisponível', esc(blocked))
-        : gateHtml('Entre para ver o histórico', 'O histórico de envios fica guardado na nuvem para todo o time. Entre com seu e-mail corporativo.', '<button type="button" class="btn btn-primary" data-act="login">' + icon('lock') + 'Entrar</button>');
+        : gateHtml('Entre para ver o histórico', 'O histórico de envios fica guardado na nuvem para todo o time. Entre com seu usuário e senha.', '<button type="button" class="btn btn-primary" data-act="login">' + icon('lock') + 'Entrar</button>');
       return;
     }
     if (S.histError) { gate.hidden = false; body.hidden = true; gate.innerHTML = gateHtml('Não consegui carregar', esc(S.histError), '<button type="button" class="btn" data-act="reload-hist">Tentar de novo</button>'); return; }
@@ -690,7 +691,7 @@
       rows.push('<tr class="h-row" data-id="' + esc(e.id) + '"><td class="c-toggle"><button type="button" class="row-toggle" data-act="toggle" data-id="' + esc(e.id) + '" aria-expanded="' + open + '" aria-label="Ver itens do envio">' + (open ? '▾' : '▸') + '</button></td>' +
         '<td>' + esc(fmtFull(e.ts)) + '</td><td class="c-store"><b>' + esc(e.loja) + '</b> <span class="muted">' + esc(e.lojaNome || '') + '</span></td>' +
         '<td>' + esc(fmtDate(e.ciclo)) + '</td><td class="r c-num">' + fmt(e.totalItens) + '</td><td class="r c-num">' + fmt(e.totalUnidades) + '</td>' +
-        '<td class="r c-num">' + fmt(e.ajustados) + '</td><td class="muted">' + esc(e.por) + '</td></tr>');
+        '<td class="r c-num">' + fmt(e.ajustados) + '</td><td class="muted">' + esc(who(e.por)) + '</td></tr>');
       if (open) {
         const its = (e.itens || []).filter(i => i.e > 0 || i.s > 0);
         rows.push('<tr class="h-detail"><td></td><td colspan="7"><div class="h-detail-in"><div class="btn-row"><button type="button" class="btn" data-act="recopy" data-id="' + esc(e.id) + '">' + icon('copy') + 'Copiar esta lista</button>' +
@@ -755,7 +756,7 @@
       const nm = c.user.email.split('@')[0];
       btn.className = 'user-btn is-in';
       btn.innerHTML = '<span class="avatar">' + esc(nm.slice(0, 2).toUpperCase()) + '</span><span class="user-name">' + esc(nm) + '</span>';
-      btn.title = c.user.email;
+      btn.title = who(c.user.email);
     } else if (c.user) {
       btn.className = 'user-btn is-pending';
       btn.innerHTML = icon('alert') + '<span>Sem acesso</span>';
@@ -763,25 +764,25 @@
     } else {
       btn.className = 'user-btn';
       btn.innerHTML = icon('lock') + '<span>Entrar</span>';
-      btn.title = c.error || 'Entrar com e-mail corporativo';
+      btn.title = c.error || 'Entrar com usuário e senha';
     }
   }
 
   let loginMode = 'in';
   function loginPanel(name) {
     ['loginForm', 'loginVerify', 'loginAccount'].forEach(id => { $(id).hidden = id !== name; });
-    $('loginTitle').textContent = name === 'loginForm' ? (loginMode === 'up' ? 'Criar conta' : loginMode === 'reset' ? 'Esqueci a senha' : 'Entrar') :
+    $('loginTitle').textContent = name === 'loginForm' ? (loginMode === 'up' ? 'Criar usuário' : loginMode === 'reset' ? 'Esqueci a senha' : 'Entrar') :
       name === 'loginVerify' ? 'Conta sem acesso' : 'Sua conta';
   }
   function setLoginMode(mode) {
     loginMode = mode;
     document.querySelectorAll('#loginSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === (mode === 'reset' ? 'in' : mode))));
     $('lgPassWrap').hidden = mode === 'reset';
-    $('lgSubmit').textContent = mode === 'up' ? 'Criar conta' : mode === 'reset' ? 'Enviar link' : 'Entrar';
-    $('lgForgot').hidden = mode !== 'in';
+    $('lgSubmit').textContent = mode === 'up' ? 'Criar usuário' : mode === 'reset' ? 'Enviar link' : 'Entrar';
+    $('lgForgot').hidden = true;
     $('lgPass').autocomplete = mode === 'up' ? 'new-password' : 'current-password';
     $('lgHint').textContent = mode === 'up'
-      ? 'Use seu e-mail corporativo. O acesso ao histórico depende de liberação do administrador.'
+      ? 'Escolha um usuário e uma senha (mínimo 6 caracteres). O acesso depende de liberação do administrador.'
       : mode === 'reset' ? 'Informe o e-mail da conta; enviaremos um link para criar uma nova senha.' : '';
     showLoginError('');
     loginPanel('loginForm');
@@ -793,8 +794,8 @@
     const c = S.cloud;
     if (c.user && c.user.local) { toast('Você está no modo local de teste: não precisa entrar.'); if (after) after(); return; }
     if (c.error && !c.user) { toast(c.error, false); return; }
-    if (c.user && c.user.allowed) { $('acEmail').textContent = c.user.email; loginPanel('loginAccount'); }
-    else if (c.user) { $('vfEmail').textContent = c.user.email; $('vfMsg').textContent = ''; loginPanel('loginVerify'); }
+    if (c.user && c.user.allowed) { $('acEmail').textContent = who(c.user.email); loginPanel('loginAccount'); }
+    else if (c.user) { $('vfEmail').textContent = who(c.user.email); $('vfMsg').textContent = ''; loginPanel('loginVerify'); }
     else setLoginMode('in');
     const dlg = $('loginDlg'); if (!dlg.open) dlg.showModal();
     setTimeout(() => { if (!$('loginForm').hidden) $('lgEmail').focus(); }, 30);
@@ -802,7 +803,7 @@
 
   function submitLogin() {
     const email = $('lgEmail').value.trim(), pass = $('lgPass').value;
-    if (!email) { showLoginError('Digite seu e-mail corporativo.'); return; }
+    if (!email) { showLoginError('Digite o usuário.'); return; }
     const btn = $('lgSubmit'); btn.disabled = true; showLoginError('');
     let p;
     if (loginMode === 'reset') p = Cloud.resetPassword(email).then(() => { showLoginError(''); $('lgHint').textContent = 'Pronto! Se existir uma conta com esse e-mail, o link chegou na caixa de entrada.'; });
@@ -831,7 +832,7 @@
       if (S.view === 'historico') renderHistory();
       if (S.view === 'analise') mountAnalysis();
     } else if (!allowed && st.user && dlg.open) {
-      $('vfEmail').textContent = st.user.email; loginPanel('loginVerify');
+      $('vfEmail').textContent = who(st.user.email); loginPanel('loginVerify');
     }
     if (!st.user && S.view === 'historico') renderHistory();
   }
