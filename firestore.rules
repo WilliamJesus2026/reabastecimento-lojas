@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Só entra quem tem conta com e-mail corporativo JÁ VERIFICADO (quem cria conta com e-mail alheio
+    // não consegue verificar). Para liberar outro domínio, acrescente-o aqui e em ALLOWED_DOMAINS (public/cloud.js).
+    function logado() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@abracadabra[.]com[.]br');
+    }
+
+    // Histórico de envios: o time todo lê e registra; ninguém edita; quem registrou pode desfazer em até 15 minutos.
+    match /envios/{envioId} {
+      allow read: if logado();
+      allow create: if logado()
+        && request.resource.data.por == request.auth.token.email
+        && request.resource.data.enviadoEm == request.time
+        && request.resource.data.keys().hasOnly(['loja', 'lojaNome', 'ciclo', 'arquivo', 'email', 'itens', 'totalItens',
+                                                 'totalUnidades', 'totalSugerido', 'ajustados', 'por', 'ts', 'enviadoEm'])
+        && request.resource.data.ts is number
+        && request.resource.data.ts > request.time.toMillis() - 600000
+        && request.resource.data.ts < request.time.toMillis() + 600000
+        && request.resource.data.loja is string && request.resource.data.loja.size() == 3
+        && request.resource.data.totalUnidades is number && request.resource.data.totalItens is number
+        && request.resource.data.itens is list && request.resource.data.itens.size() <= 3000
+        && (request.resource.data.itens.size() == 0 || request.resource.data.itens[0] is map);
+      allow update: if false;
+      allow delete: if logado()
+        && resource.data.por == request.auth.token.email
+        && request.time < resource.data.enviadoEm + duration.value(15, 'm');
+    }
+
+    // E-mails de contato de cada loja (compartilhado pelo time).
+    match /config/emails {
+      allow read, create, update: if logado();   // sem delete: o documento não pode ser apagado
+    }
+  }
+}
