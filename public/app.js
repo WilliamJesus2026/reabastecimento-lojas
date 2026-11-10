@@ -758,8 +758,8 @@
       btn.title = c.user.email;
     } else if (c.user) {
       btn.className = 'user-btn is-pending';
-      btn.innerHTML = icon('mail') + '<span>Confirmar e-mail</span>';
-      btn.title = 'Falta confirmar seu e-mail';
+      btn.innerHTML = icon('alert') + '<span>Sem acesso</span>';
+      btn.title = 'Esta conta não pode usar o painel';
     } else {
       btn.className = 'user-btn';
       btn.innerHTML = icon('lock') + '<span>Entrar</span>';
@@ -771,7 +771,7 @@
   function loginPanel(name) {
     ['loginForm', 'loginVerify', 'loginAccount'].forEach(id => { $(id).hidden = id !== name; });
     $('loginTitle').textContent = name === 'loginForm' ? (loginMode === 'up' ? 'Criar conta' : loginMode === 'reset' ? 'Esqueci a senha' : 'Entrar') :
-      name === 'loginVerify' ? 'Confirme seu e-mail' : 'Sua conta';
+      name === 'loginVerify' ? 'Conta sem acesso' : 'Sua conta';
   }
   function setLoginMode(mode) {
     loginMode = mode;
@@ -781,7 +781,7 @@
     $('lgForgot').hidden = mode !== 'in';
     $('lgPass').autocomplete = mode === 'up' ? 'new-password' : 'current-password';
     $('lgHint').textContent = mode === 'up'
-      ? 'Use seu e-mail corporativo. Vamos enviar um link para confirmar que o e-mail é seu.'
+      ? 'Use seu e-mail corporativo. O acesso ao histórico depende de liberação do administrador.'
       : mode === 'reset' ? 'Informe o e-mail da conta; enviaremos um link para criar uma nova senha.' : '';
     showLoginError('');
     loginPanel('loginForm');

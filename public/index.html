@@ -218,9 +218,9 @@ try{var t=localStorage.getItem('reab_theme');if(t==='dark'||t==='light')document
       <div class="btn-row"><button class="btn btn-primary" id="lgSubmit" type="button">Entrar</button><button class="link-btn" id="lgForgot" type="button">Esqueci a senha</button></div>
     </div>
     <div id="loginVerify" hidden>
-      <p>Enviamos um link de confirmação para <b id="vfEmail"></b>. Abra o e-mail, clique no link e volte aqui.</p>
+      <p>A conta <b id="vfEmail"></b> não pode usar o painel (só e-mails @abracadabra.com.br liberados). Entre com outra conta.</p>
       <p class="hint" id="vfMsg"></p>
-      <div class="btn-row"><button class="btn btn-primary" id="vfDone" type="button">Já confirmei</button><button class="btn" id="vfResend" type="button">Reenviar e-mail</button><button class="link-btn" id="vfOut" type="button">Sair</button></div>
+      <div class="btn-row"><button class="btn" id="vfDone" type="button" hidden>Já confirmei</button><button class="btn" id="vfResend" type="button" hidden>Reenviar e-mail</button><button class="btn btn-primary" id="vfOut" type="button">Sair e trocar de conta</button></div>
     </div>
     <div id="loginAccount" hidden>
       <p>Você está conectado como <b id="acEmail"></b>. Os envios que registrar ficam no histórico do time.</p>

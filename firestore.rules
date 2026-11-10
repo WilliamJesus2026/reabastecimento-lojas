@@ -2,12 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Só entra quem tem conta com e-mail corporativo JÁ VERIFICADO (quem cria conta com e-mail alheio
-    // não consegue verificar). Para liberar outro domínio, acrescente-o aqui e em ALLOWED_DOMAINS (public/cloud.js).
+    // Só entra quem está nesta lista de e-mails. A lista (e não "qualquer @abracadabra") é o que impede
+    // um desconhecido de criar conta com um e-mail da empresa e entrar. Para liberar mais pessoas,
+    // acrescente o e-mail aqui e rode: firebase deploy --only firestore
     function logado() {
       return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.matches('.*@abracadabra[.]com[.]br');
+        && request.auth.token.email in ['admin1@abracadabra.com.br'];
     }
 
     // Histórico de envios: o time todo lê e registra; ninguém edita; quem registrou pode desfazer em até 15 minutos.

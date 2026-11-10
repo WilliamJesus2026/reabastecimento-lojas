@@ -39,7 +39,7 @@
       'auth/network-request-failed': 'Sem conexão com a internet. Confira a rede e tente de novo.',
       'auth/operation-not-allowed': 'O login por e-mail e senha ainda não foi ativado no Firebase (Authentication > Sign-in method).',
       'auth/missing-password': 'Digite a senha.',
-      'permission-denied': 'Sem permissão. Confirme que seu e-mail foi verificado e que é um e-mail corporativo.'
+      'permission-denied': 'Esta conta não tem acesso ao histórico. Peça a liberação do seu e-mail ao administrador do painel.'
     };
     return makeError(map[c] || ('Não foi possível concluir (' + (c || (e && e.message) || 'erro') + ').'), c || 'auth');
   }
@@ -98,7 +98,7 @@
   function setUser(u) {
     if (!u) { state.user = null; }
     else {
-      state.user = { email: u.email, verified: !!u.emailVerified, allowed: !!u.emailVerified && domainOk(u.email), local: false };
+      state.user = { email: u.email, verified: !!u.emailVerified, allowed: domainOk(u.email), local: false };
     }
     state.ready = true;
     emit();
@@ -146,8 +146,6 @@
       email = String(email || '').trim();
       if (!domainOk(email)) return Promise.reject(makeError('Use seu e-mail corporativo (@' + ALLOWED_DOMAINS.join(' ou @') + ').', 'domain'));
       return auth.createUserWithEmailAndPassword(email, pass)
-        .then(function (cred) { return cred.user.sendEmailVerification(); })
-        .then(function () { return auth.currentUser.reload(); })
         .then(function () { setUser(auth.currentUser); }, function (e) { throw friendlyAuthError(e); });
     },
     resetPassword: function (email) {
@@ -190,7 +188,7 @@
         var q = db.collection('envios').where('ts', '>=', since).orderBy('ts', 'desc');
         if (opts.limit) q = q.limit(opts.limit);
         return q.get();
-      }).then(function (snap) {
+      }).catch(function (e) { throw e && e.code === 'permission-denied' ? friendlyAuthError(e) : e; }).then(function (snap) {
         var rows = [];
         snap.forEach(function (d) { var x = d.data(); x.id = d.id; delete x.enviadoEm; rows.push(x); });
         return rows;
