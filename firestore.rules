@@ -17,7 +17,8 @@ service cloud.firestore {
         && request.resource.data.por == request.auth.token.email
         && request.resource.data.enviadoEm == request.time
         && request.resource.data.keys().hasOnly(['loja', 'lojaNome', 'ciclo', 'arquivo', 'email', 'itens', 'totalItens',
-                                                 'totalUnidades', 'totalSugerido', 'ajustados', 'por', 'ts', 'enviadoEm'])
+                                                 'totalUnidades', 'totalSugerido', 'ajustados', 'por', 'ts', 'enviadoEm', 'dev'])
+        && request.resource.data.dev is string && request.resource.data.dev.size() <= 40
         && request.resource.data.ts is number
         && request.resource.data.ts > request.time.toMillis() - 600000
         && request.resource.data.ts < request.time.toMillis() + 600000

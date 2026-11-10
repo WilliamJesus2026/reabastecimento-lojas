@@ -51,7 +51,7 @@
     hist: [], histLoaded: false, histLoading: false, histError: null, lastSent: {}, sentCycle: {},
     mailOpened: {},
     hFilter: { loja: '', dias: 30, q: '' }, hOpen: {}, hLimit: 50,
-    afterLogin: null
+    afterLogin: null, unsubHist: null, unsubEmails: null
   };
 
   const $ = id => document.getElementById(id);
@@ -67,6 +67,10 @@
   const fmtStamp = ts => { const d = new Date(ts); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
   const fmtFull = ts => { const d = new Date(ts); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
   const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+  const DEV = (function () {
+    try { let d = localStorage.getItem('reab_dev'); if (!d) { d = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('reab_dev', d); } return d; }
+    catch (e) { return 'x' + Math.random().toString(36).slice(2, 10); }
+  })();
   const who = e => String(e == null ? '' : e).split('@')[0];
   const cycleIso = () => S.meta.cycle || todayIso();
 
@@ -586,7 +590,7 @@
     });
     const sent = itens.filter(i => i.e > 0);
     return {
-      loja: code, lojaNome: STORE_NAME[code], ciclo: cycleIso(), arquivo: S.meta.file || '',
+      dev: DEV, loja: code, lojaNome: STORE_NAME[code], ciclo: cycleIso(), arquivo: S.meta.file || '',
       email: String($('storeEmail').value || '').trim(),
       itens: itens, totalItens: sent.length,
       totalUnidades: sent.reduce((s, i) => s + i.e, 0), totalSugerido: itens.reduce((s, i) => s + i.s, 0),
@@ -611,7 +615,8 @@
       if (!yes) return null;
       $('btnRegister').disabled = true;
       return Cloud.addEnvio(buildEnvioDoc(code)).then(rec => {
-        S.hist.unshift(rec); indexHistory();
+        if (!S.hist.some(h => h.id === rec.id)) S.hist.unshift(rec);
+        indexHistory();
         S.mailOpened[code] = false;
         renderSummary(); renderStores(); renderSend();
         if (S.view === 'historico') renderHistory();
@@ -636,23 +641,39 @@
     }).catch(e => toast(e && e.userFacing ? e.message : 'Não foi possível desfazer.', false));
   }
 
+  function refreshAfterHistory() {
+    const ae = document.activeElement;
+    if (ae && ae.tagName === 'INPUT' && ae.closest('#view-reposicao')) { renderSummary(); renderStores(); renderSentNote(); }
+    else renderReposicao();
+    if (S.view === 'historico') renderHistory();
+    if (S.view === 'analise') mountAnalysis();
+  }
+
+  // Histórico em tempo real: qualquer envio registrado por qualquer pessoa aparece aqui na hora.
   function ensureHistory(force) {
-    if (!cloudAllowed() || S.histLoading) return;
-    if (S.histLoaded && !force) return;
-    S.histLoading = true; S.histError = null;
-    Cloud.listEnvios({ sinceDays: HIST_DAYS, limit: HIST_LIMIT }).then(rows => {
+    if (!cloudAllowed()) return;
+    if (S.unsubHist && !force) return;
+    if (S.unsubHist) { S.unsubHist(); S.unsubHist = null; }
+    S.histLoading = !S.histLoaded; S.histError = null;
+    S.unsubHist = Cloud.subscribeEnvios({ sinceDays: HIST_DAYS, limit: HIST_LIMIT }, rows => {
+      if (!cloudAllowed()) return;
       rows.forEach(e => { e.itens = (Array.isArray(e.itens) ? e.itens : []).filter(i => i && typeof i === 'object'); });
-      if (!cloudAllowed()) { S.histLoading = false; return; }
-      S.hist = rows; S.histLoaded = true; S.histLoading = false; indexHistory();
-      if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('enviar-input')) { renderSummary(); renderStores(); }
-      else renderReposicao();
-      if (S.view === 'historico') renderHistory();
-      if (S.view === 'analise') mountAnalysis();
-    }).catch(e => {
-      S.histLoading = false; S.histError = e && e.userFacing ? e.message : 'Não consegui carregar o histórico.';
+      const known = new Set(S.hist.map(h => h.id));
+      const fresh = S.histLoaded ? rows.filter(r => !known.has(r.id) && r.dev && r.dev !== DEV) : [];
+      S.hist = rows; S.histLoaded = true; S.histLoading = false; S.histError = null;
+      indexHistory();
+      refreshAfterHistory();
+      fresh.slice(0, 2).forEach(r => toast(who(r.por) + ' registrou o envio da ' + r.loja + ' em outro computador (' + fmt(r.totalUnidades) + ' un.).'));
+    }, err => {
+      S.histLoading = false; S.histError = err && err.userFacing ? err.message : 'Perdi a conexão com o histórico.';
       if (S.view === 'historico') renderHistory();
       if (S.view === 'analise') mountAnalysis();
     });
+  }
+
+  function stopSync() {
+    if (S.unsubHist) { S.unsubHist(); S.unsubHist = null; }
+    if (S.unsubEmails) { S.unsubEmails(); S.unsubEmails = null; }
   }
 
   function renderHistory() {
@@ -820,13 +841,14 @@
     const dlg = $('loginDlg');
     if (allowed && !wasAllowed) {
       if (dlg.open) dlg.close();
-      syncEmailsFromCloud();
+      startEmails();
       ensureHistory(true);
       const cb = S.afterLogin; S.afterLogin = null;
       renderReposicao();
       if (S.view === 'historico') renderHistory();
       if (cb) setTimeout(cb, 50);
     } else if (!allowed && wasAllowed) {
+      stopSync();
       S.hist = []; S.histLoaded = false; S.histError = null; indexHistory();
       renderReposicao();
       if (S.view === 'historico') renderHistory();
@@ -838,14 +860,23 @@
   }
 
   const dirtyEmail = {};
-  function syncEmailsFromCloud() {
-    Cloud.loadEmails().then(cloud => {
+  // E-mails das lojas em tempo real: o que um colega salvar aparece aqui sem recarregar.
+  function startEmails() {
+    if (S.unsubEmails) return;
+    let first = true;
+    S.unsubEmails = Cloud.subscribeEmails(cloud => {
       Object.keys(cloud).forEach(k => { if (cloud[k] && !dirtyEmail[k]) S.emails[k] = cloud[k]; });
-      // migra o que estava só neste navegador (versão anterior do painel) para a nuvem
-      Object.keys(S.emails).forEach(k => { if (!cloud[k] && S.emails[k] && parseEmails(S.emails[k]).valid) Cloud.saveEmail(k, S.emails[k]).catch(() => {}); });
+      if (first) {
+        first = false;
+        // migra o que estava só neste navegador (versão anterior do painel) para a nuvem
+        Object.keys(S.emails).forEach(k => { if (!cloud[k] && S.emails[k] && parseEmails(S.emails[k]).valid) Cloud.saveEmail(k, S.emails[k]).catch(() => {}); });
+      }
       persistEmailsCache();
-      if (S.view === 'reposicao') renderSend();
-    }).catch(() => { /* sem permissão ou rede: segue com o cache */ });
+      const inp = $('storeEmail');
+      if (S.view === 'reposicao' && S.selected !== ALL && document.activeElement !== inp && inp.value !== (S.emails[S.selected] || '')) {
+        inp.value = S.emails[S.selected] || ''; updateEmailSaved();
+      }
+    }, () => { /* sem permissão ou rede: segue com o cache local */ });
   }
 
   /* ---------- leitura de arquivos (Web Worker) ---------- */

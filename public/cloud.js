@@ -59,6 +59,10 @@
   }
   function lsWrite(d) { try { root.localStorage.setItem(LOCAL_KEY, JSON.stringify(d)); } catch (e) { throw makeError('Sem espaço para guardar o histórico neste navegador.', 'quota'); } }
 
+  var localSubs = [];
+  function localNotify() { setTimeout(function () { localSubs.slice().forEach(function (f) { try { f(); } catch (e) { /* ouvinte */ } }); }, 0); }
+  if (root.addEventListener) root.addEventListener('storage', function (e) { if (e.key === LOCAL_KEY) localNotify(); });
+
   var localApi = {
     init: function () {
       state.mode = 'local'; state.ready = true;
@@ -78,13 +82,13 @@
       return Promise.resolve(out);
     },
     saveEmail: function (code, value) {
-      var d = lsRead(); d.emails[code] = { v: value, t: Date.now(), por: 'modo local' }; lsWrite(d);
+      var d = lsRead(); d.emails[code] = { v: value, t: Date.now(), por: 'modo local' }; lsWrite(d); localNotify();
       return Promise.resolve();
     },
     addEnvio: function (data) {
       var d = lsRead(); d.seq = (d.seq || 0) + 1;
       var rec = Object.assign({}, data, { id: 'local-' + d.seq, seq: d.seq, ts: Date.now(), por: 'modo local' });
-      d.envios.push(rec); lsWrite(d);
+      d.envios.push(rec); lsWrite(d); localNotify();
       return Promise.resolve(rec);
     },
     listEnvios: function (opts) {
@@ -97,8 +101,18 @@
       var rec = d.envios.filter(function (e) { return e.id === id; })[0];
       if (!rec) return Promise.reject(makeError('Envio não encontrado.', 'not-found'));
       if (Date.now() - rec.ts > UNDO_MS) return Promise.reject(makeError('Só é possível desfazer em até 15 minutos.', 'undo-expired'));
-      d.envios = d.envios.filter(function (e) { return e.id !== id; }); lsWrite(d);
+      d.envios = d.envios.filter(function (e) { return e.id !== id; }); lsWrite(d); localNotify();
       return Promise.resolve();
+    },
+    subscribeEnvios: function (opts, cb) {
+      var f = function () { localApi.listEnvios(opts).then(cb); };
+      localSubs.push(f); setTimeout(f, 0);
+      return function () { localSubs = localSubs.filter(function (x) { return x !== f; }); };
+    },
+    subscribeEmails: function (cb) {
+      var f = function () { localApi.loadEmails().then(cb); };
+      localSubs.push(f); setTimeout(f, 0);
+      return function () { localSubs = localSubs.filter(function (x) { return x !== f; }); };
     }
   };
 
@@ -199,6 +213,34 @@
         return rows;
       });
     },
+    subscribeEnvios: function (opts, cb, errCb) {
+      opts = opts || {};
+      var cancelled = false, unsub = null;
+      requireAllowed().then(function () {
+        if (cancelled) return;
+        var since = Date.now() - (opts.sinceDays || 365) * 86400000;
+        var q = db.collection('envios').where('ts', '>=', since).orderBy('ts', 'desc');
+        if (opts.limit) q = q.limit(opts.limit);
+        unsub = q.onSnapshot(function (snap) {
+          var rows = [];
+          snap.forEach(function (d) { var x = d.data(); x.id = d.id; delete x.enviadoEm; rows.push(x); });
+          cb(rows);
+        }, function (e) { if (errCb) errCb(e && e.code === 'permission-denied' ? friendlyAuthError(e) : makeError('Perdi a conexão com o histórico. Recarregue a página.', 'sync')); });
+      }, function (e) { if (errCb) errCb(e); });
+      return function () { cancelled = true; if (unsub) unsub(); };
+    },
+    subscribeEmails: function (cb, errCb) {
+      var cancelled = false, unsub = null;
+      requireAllowed().then(function () {
+        if (cancelled) return;
+        unsub = db.collection('config').doc('emails').onSnapshot(function (snap) {
+          var out = {}, d = snap.exists ? snap.data() : {};
+          Object.keys(d).forEach(function (k) { if (d[k] && typeof d[k].v === 'string') out[k] = d[k].v; });
+          cb(out);
+        }, function (e) { if (errCb) errCb(e); });
+      }, function (e) { if (errCb) errCb(e); });
+      return function () { cancelled = true; if (unsub) unsub(); };
+    },
     removeEnvio: function (id) {
       return requireAllowed().then(function () { return db.collection('envios').doc(id).delete(); })
         .then(function () {}, function (e) {
@@ -235,6 +277,8 @@
     addEnvio: function (d) { return impl.addEnvio(d); },
     listEnvios: function (o) { return impl.listEnvios(o); },
     removeEnvio: function (id) { return impl.removeEnvio(id); },
+    subscribeEnvios: function (o, cb, ec) { return impl.subscribeEnvios(o, cb, ec); },
+    subscribeEmails: function (cb, ec) { return impl.subscribeEmails(cb, ec); },
     _reset: function () { initPromise = null; listeners = []; state = { mode: 'firebase', ready: false, user: null, error: null, busy: false }; fb = auth = db = null; }
   };
   return api;
